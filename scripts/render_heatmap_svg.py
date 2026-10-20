@@ -60,10 +60,10 @@ FLASH = "#7ee2a8"
 
 # after the reveal, a handful of boxes glint now and then -- each on its own
 # slow, offset cycle so only one or two are ever lit at once
-GLITTER_FIELD = 32        # field boxes that glint
-GLITTER_NAME = 10          # name boxes that glint (a touch brighter)
+GLITTER_FIELD = 40        # field boxes that glint
+GLITTER_NAME = 12          # name boxes that glint (a touch brighter)
 GLITTER_MIN, GLITTER_MAX = 7.0, 13.0   # cycle length range, seconds
-GLITTER_PEAK = 0.6
+GLITTER_PEAK = 0.9
 FONT = {
     "N": ["#...#", "##..#", "##..#", "#.#.#", "#..##", "#..##", "#...#"],
     "A": [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
@@ -166,8 +166,8 @@ def render(data):
       animation: lit {POP_DUR:.2f}s cubic-bezier(.3,1.4,.5,1) both, shine {SHINE_DUR:.2f}s ease-out both; }}
 @keyframes glint {{
   0%, 100% {{ opacity: 0; }}
-  6%       {{ opacity: {GLITTER_PEAK}; }}
-  14%      {{ opacity: 0; }}
+  7%       {{ opacity: {GLITTER_PEAK}; }}
+  18%      {{ opacity: 0; }}
 }}
 .g {{ opacity: 0; animation: glint linear infinite; pointer-events: none; }}
 @media (prefers-reduced-motion: reduce) {{ .c, .n {{ opacity: 1; transform: none; animation: none; }} .g {{ display: none; }} }}
@@ -235,8 +235,8 @@ def render(data):
     name_pos = [c[:2] for c in cells]
     field_pos = sorted(occupied - set(name_pos))
     settle = shine_start + SHINE_DUR
-    for picks, color in [(rng.sample(field_pos, GLITTER_FIELD), "#3fb950"),
-                         (rng.sample(name_pos, GLITTER_NAME), "#7ee787")]:
+    for picks, color in [(rng.sample(field_pos, GLITTER_FIELD), "#56d364"),
+                         (rng.sample(name_pos, GLITTER_NAME), "#aff5b4")]:
         for ci, ri in picks:
             dur = rng.uniform(GLITTER_MIN, GLITTER_MAX)
             parts.append(
