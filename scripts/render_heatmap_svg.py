@@ -4,8 +4,8 @@ Render data/contributions.json (produced by fetch_contributions.py) as a proper
 GitHub-style contribution heatmap SVG: a grid of rounded, colored BOXES in the
 classic 53-week x 7-day calendar on a soft green field, revealed once with a
 diagonal pop-in wave (CSS keyframes, plays on load then freezes) that lights
-the name NAVEEN into the grid as it passes (where it stays), a Less->More
-legend, and a real stats footer.
+the name NAVEEN into the grid as it passes (where it stays), then a sparse,
+slow glitter of a few boxes that keeps going, a Less->More legend, and a real stats footer.
 
 Run by .github/workflows/update-profile-art.yml after fetch_contributions.py.
 """
@@ -55,8 +55,15 @@ LETTER_GAP = 2
 NAME_LAG = 0.06      # name cells trail the wave by a hair so the flash rides its front
 POP_DUR = 0.55
 SHINE_DUR = 0.7
-NAME_GREENS = ["#39d353", "#4ade6a", "#2fc94a"]   # slight variation reads as real cells
-FLASH = "#c8ffcf"
+NAME_GREENS = ["#238f3e", "#26a641", "#1f8a3a"]   # a few steps above the field: readable, not loud
+FLASH = "#7ee2a8"
+
+# after the reveal, a handful of boxes glint now and then -- each on its own
+# slow, offset cycle so only one or two are ever lit at once
+GLITTER_FIELD = 26        # field boxes that glint
+GLITTER_NAME = 8          # name boxes that glint (a touch brighter)
+GLITTER_MIN, GLITTER_MAX = 7.0, 13.0   # cycle length range, seconds
+GLITTER_PEAK = 0.45
 FONT = {
     "N": ["#...#", "##..#", "##..#", "#.#.#", "#..##", "#..##", "#...#"],
     "A": [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
@@ -153,11 +160,17 @@ def render(data):
 }}
 @keyframes shine {{
   0%, 100% {{ filter: brightness(1); }}
-  40%      {{ filter: brightness(1.75); }}
+  40%      {{ filter: brightness(1.4); }}
 }}
 .n {{ opacity: 0; transform-box: fill-box; transform-origin: center;
       animation: lit {POP_DUR:.2f}s cubic-bezier(.3,1.4,.5,1) both, shine {SHINE_DUR:.2f}s ease-out both; }}
-@media (prefers-reduced-motion: reduce) {{ .c, .n {{ opacity: 1; transform: none; animation: none; }} }}
+@keyframes glint {{
+  0%, 100% {{ opacity: 0; }}
+  6%       {{ opacity: {GLITTER_PEAK}; }}
+  14%      {{ opacity: 0; }}
+}}
+.g {{ opacity: 0; animation: glint linear infinite; pointer-events: none; }}
+@media (prefers-reduced-motion: reduce) {{ .c, .n {{ opacity: 1; transform: none; animation: none; }} .g {{ display: none; }} }}
 """.strip()
 
     parts = [
@@ -216,6 +229,21 @@ def render(data):
             f'<rect class="n" x="{grid_left + ci * STEP}" y="{grid_top + ri * STEP}" width="{CELL}" height="{CELL}" '
             f'rx="2.5" fill="{NAME_GREENS[(ci * 7 + ri) % 3]}" style="animation-delay:{delay:.3f}s,{shine:.3f}s"/>'
         )
+
+    # glitter -- fixed seed so the daily refresh doesn't reshuffle it
+    rng = random.Random("glitter")
+    name_pos = [c[:2] for c in cells]
+    field_pos = sorted(occupied - set(name_pos))
+    settle = shine_start + SHINE_DUR
+    for picks, color in [(rng.sample(field_pos, GLITTER_FIELD), "#2ea043"),
+                         (rng.sample(name_pos, GLITTER_NAME), "#56d364")]:
+        for ci, ri in picks:
+            dur = rng.uniform(GLITTER_MIN, GLITTER_MAX)
+            parts.append(
+                f'<rect class="g" x="{grid_left + ci * STEP}" y="{grid_top + ri * STEP}" width="{CELL}" '
+                f'height="{CELL}" rx="2.5" fill="{color}" '
+                f'style="animation-duration:{dur:.2f}s;animation-delay:{settle + rng.uniform(0, dur):.2f}s"/>'
+            )
 
     # legend: Less [][][][][] More (bottom-right of the grid)
     leg_y = grid_top + art_h + 6
