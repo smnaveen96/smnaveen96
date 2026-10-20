@@ -48,13 +48,11 @@ CELL_DUR = 0.5
 FIELD_GREENS = ["#0d3a22", "#0e4429", "#0e4429", "#104a2d", "#12532f", "#145c33"]
 
 # the name, drawn into the grid in a 5x7 pixel font. its cells pop in with the
-# reveal wave itself (pale flash, slight bounce, settle to green), a single
-# shine runs across the word once the wave has passed, and it stays lit.
+# reveal wave itself (pale flash, slight bounce, settle to green) and stays lit.
 NAME = "NAVEEN"
 LETTER_GAP = 2
 NAME_LAG = 0.06      # name cells trail the wave by a hair so the flash rides its front
 POP_DUR = 0.55
-SHINE_DUR = 0.7
 NAME_GREENS = ["#2cb34d", "#30c452", "#28ad48"]   # a few steps above the field: readable, not loud
 FLASH = "#7ee2a8"
 
@@ -157,12 +155,8 @@ def render(data):
   55%  {{ opacity: 1; transform: scale(1.22); fill: {FLASH}; }}
   100% {{ opacity: 1; transform: scale(1); }}
 }}
-@keyframes shine {{
-  0%, 100% {{ filter: brightness(1); }}
-  40%      {{ filter: brightness(1.55); }}
-}}
 .n {{ opacity: 0; transform-box: fill-box; transform-origin: center;
-      animation: lit {POP_DUR:.2f}s cubic-bezier(.3,1.4,.5,1) both, shine {SHINE_DUR:.2f}s ease-out both; }}
+      animation: lit {POP_DUR:.2f}s cubic-bezier(.3,1.4,.5,1) both; }}
 @keyframes glint {{
   0%, 100% {{ opacity: 0; }}
   7%       {{ opacity: {GLITTER_PEAK}; }}
@@ -221,18 +215,16 @@ def render(data):
     # the name -- lit cells on top of the real boxes; they light up once and stay
     occupied = {(ci, ri) for ci, column in enumerate(grid) for ri, cell in enumerate(column) if cell}
     cells = [c for c in name_cells(n_cols) if c[:2] in occupied]
-    shine_start = max(d for _, _, d in cells) + POP_DUR
     for ci, ri, delay in cells:
-        shine = shine_start + (ci - cells[0][0]) * 0.02
         parts.append(
             f'<rect class="n" x="{grid_left + ci * STEP}" y="{grid_top + ri * STEP}" width="{CELL}" height="{CELL}" '
-            f'rx="2.5" fill="{NAME_GREENS[(ci * 7 + ri) % 3]}" style="animation-delay:{delay:.3f}s,{shine:.3f}s"/>'
+            f'rx="2.5" fill="{NAME_GREENS[(ci * 7 + ri) % 3]}" style="animation-delay:{delay:.3f}s"/>'
         )
 
     # glitter -- fixed seed so the daily refresh doesn't reshuffle it
     rng = random.Random("glitter")
     field_pos = sorted(occupied - {c[:2] for c in cells})
-    settle = shine_start + SHINE_DUR
+    settle = max(d for _, _, d in cells) + POP_DUR
     for ci, ri in rng.sample(field_pos, GLITTER_FIELD):
         dur = rng.uniform(GLITTER_MIN, GLITTER_MAX)
         parts.append(
