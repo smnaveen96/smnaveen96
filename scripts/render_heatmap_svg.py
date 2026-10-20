@@ -53,7 +53,10 @@ FIELD_GREENS = ["#0d3a22", "#0e4429", "#0e4429", "#104a2d", "#12532f", "#145c33"
 NAME = "NAVEEN"
 LETTER_GAP = 2
 POP_DUR = 0.55
-SHINE_DUR = 0.7
+SHINE_DUR = 0.6
+SHINE_COL_T = 0.04    # left -> right travel of the sheen across the word
+SHINE_FILL = "#b4f5c0"
+SHINE_PEAK = 0.35
 NAME_GREENS = ["#2cb34d", "#30c452", "#28ad48"]   # a few steps above the field: readable, not loud
 
 # after the reveal, a handful of boxes glint now and then -- each on its own
@@ -156,18 +159,19 @@ def render(data):
   100% {{ opacity: 1; transform: scale(1); }}
 }}
 @keyframes shine {{
-  0%, 100% {{ filter: brightness(1); }}
-  40%      {{ filter: brightness(1.55); }}
+  0%, 100% {{ opacity: 0; }}
+  40%      {{ opacity: {SHINE_PEAK}; }}
 }}
 .n {{ opacity: 0; transform-box: fill-box; transform-origin: center;
-      animation: lit {POP_DUR:.2f}s cubic-bezier(.3,1.4,.5,1) both, shine {SHINE_DUR:.2f}s ease-out both; }}
+      animation: lit {POP_DUR:.2f}s cubic-bezier(.3,1.4,.5,1) both; }}
+.s {{ opacity: 0; animation: shine {SHINE_DUR:.2f}s ease-in-out both; pointer-events: none; }}
 @keyframes glint {{
   0%, 100% {{ opacity: 0; }}
   7%       {{ opacity: {GLITTER_PEAK}; }}
   18%      {{ opacity: 0; }}
 }}
 .g {{ opacity: 0; animation: glint linear infinite; pointer-events: none; }}
-@media (prefers-reduced-motion: reduce) {{ .c, .n {{ opacity: 1; transform: none; animation: none; }} .g {{ display: none; }} }}
+@media (prefers-reduced-motion: reduce) {{ .c, .n {{ opacity: 1; transform: none; animation: none; }} .g, .s {{ display: none; }} }}
 """.strip()
 
     parts = [
@@ -221,16 +225,21 @@ def render(data):
     cells = [c for c in name_cells(n_cols) if c[:2] in occupied]
     shine_start = max(d for _, _, d in cells) + POP_DUR
     for ci, ri, delay in cells:
-        shine = shine_start + (ci - cells[0][0]) * 0.02
+        shine = shine_start + (ci - cells[0][0]) * SHINE_COL_T
         parts.append(
             f'<rect class="n" x="{grid_left + ci * STEP}" y="{grid_top + ri * STEP}" width="{CELL}" height="{CELL}" '
-            f'rx="2.5" fill="{NAME_GREENS[(ci * 7 + ri) % 3]}" style="animation-delay:{delay:.3f}s,{shine:.3f}s"/>'
+            f'rx="2.5" fill="{NAME_GREENS[(ci * 7 + ri) % 3]}" style="animation-delay:{delay:.3f}s"/>'
+        )
+        # sheen: a pale layer over the cell that fades up and away once, travelling left -> right
+        parts.append(
+            f'<rect class="s" x="{grid_left + ci * STEP}" y="{grid_top + ri * STEP}" width="{CELL}" height="{CELL}" '
+            f'rx="2.5" fill="{SHINE_FILL}" style="animation-delay:{shine:.3f}s"/>'
         )
 
     # glitter -- fixed seed so the daily refresh doesn't reshuffle it
     rng = random.Random("glitter")
     field_pos = sorted(occupied - {c[:2] for c in cells})
-    settle = shine_start + SHINE_DUR
+    settle = shine + SHINE_DUR
     for ci, ri in rng.sample(field_pos, GLITTER_FIELD):
         dur = rng.uniform(GLITTER_MIN, GLITTER_MAX)
         parts.append(
