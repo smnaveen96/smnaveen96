@@ -59,11 +59,10 @@ NAME_GREENS = ["#2cb34d", "#30c452", "#28ad48"]   # a few steps above the field:
 FLASH = "#7ee2a8"
 
 # after the reveal, a handful of boxes glint now and then -- each on its own
-# slow, offset cycle so only one or two are ever lit at once
-GLITTER_FIELD = 40        # field boxes that glint
-GLITTER_NAME = 12          # name boxes that glint (a touch brighter)
+# slow, offset cycle so only a scattered few are lit at once
+GLITTER_FIELD = 44        # field boxes that glint (the name itself stays calm)
 GLITTER_MIN, GLITTER_MAX = 7.0, 13.0   # cycle length range, seconds
-GLITTER_PEAK = 0.9
+GLITTER_PEAK = 1.0
 FONT = {
     "N": ["#...#", "##..#", "##..#", "#.#.#", "#..##", "#..##", "#...#"],
     "A": [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
@@ -232,18 +231,15 @@ def render(data):
 
     # glitter -- fixed seed so the daily refresh doesn't reshuffle it
     rng = random.Random("glitter")
-    name_pos = [c[:2] for c in cells]
-    field_pos = sorted(occupied - set(name_pos))
+    field_pos = sorted(occupied - {c[:2] for c in cells})
     settle = shine_start + SHINE_DUR
-    for picks, color in [(rng.sample(field_pos, GLITTER_FIELD), "#56d364"),
-                         (rng.sample(name_pos, GLITTER_NAME), "#aff5b4")]:
-        for ci, ri in picks:
-            dur = rng.uniform(GLITTER_MIN, GLITTER_MAX)
-            parts.append(
-                f'<rect class="g" x="{grid_left + ci * STEP}" y="{grid_top + ri * STEP}" width="{CELL}" '
-                f'height="{CELL}" rx="2.5" fill="{color}" '
-                f'style="animation-duration:{dur:.2f}s;animation-delay:{settle + rng.uniform(0, dur):.2f}s"/>'
-            )
+    for ci, ri in rng.sample(field_pos, GLITTER_FIELD):
+        dur = rng.uniform(GLITTER_MIN, GLITTER_MAX)
+        parts.append(
+            f'<rect class="g" x="{grid_left + ci * STEP}" y="{grid_top + ri * STEP}" width="{CELL}" '
+            f'height="{CELL}" rx="2.5" fill="#6ee07f" '
+            f'style="animation-duration:{dur:.2f}s;animation-delay:{settle + rng.uniform(0, dur):.2f}s"/>'
+        )
 
     # legend: Less [][][][][] More (bottom-right of the grid)
     leg_y = grid_top + art_h + 6
