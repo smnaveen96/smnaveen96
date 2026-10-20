@@ -4,14 +4,15 @@ Render data/contributions.json (produced by fetch_contributions.py) as a proper
 GitHub-style contribution heatmap SVG: a grid of rounded, colored BOXES in the
 classic 53-week x 7-day calendar on a soft green field, revealed once with a
 diagonal pop-in wave (CSS keyframes, plays on load then freezes) that lights
-the name NAVEEN into the grid as it passes (where it stays), then a sparse,
-slow glitter of a few boxes that trails the wave, plays once more and settles,
-a Less->More legend, and a real stats footer.
+the name NAVEEN into the grid as it passes (where it stays), a glitter that
+sparkles hardest while the name is written and thins out into a gentle endless
+twinkle, a Less->More legend, and a real stats footer.
 
 Run by .github/workflows/update-profile-art.yml after fetch_contributions.py.
 """
 import datetime
 import json
+import math
 import os
 import random
 
@@ -60,19 +61,19 @@ SHINE_FILL = "#b4f5c0"
 SHINE_PEAK = 0.35
 NAME_GREENS = ["#2cb34d", "#30c452", "#28ad48"]   # a few steps above the field: readable, not loud
 
-# a handful of boxes glint just behind the reveal wave, so the sparkle flows in
-# while the name is being written, then once more later -- each on its own
-# slow, offset cycle so only a scattered few are lit at once. each glint is a
-# short chain of SMIL <set> steps (dim -> bright -> dim) rather than a CSS
-# keyframe: discrete steps let the browser redraw only when a glint changes.
-# most boxes stop after GLITTER_PASSES cycles and only GLITTER_LOOP keep going:
-# even stepped, looping all of them kept a phone's main thread ~15% busy for as
-# long as the profile stayed open.
-GLITTER_FIELD = 44        # field boxes that glint (the name itself stays calm)
-GLITTER_MIN, GLITTER_MAX = 7.0, 13.0   # cycle length range, seconds
-GLITTER_PASSES = 2        # glints per box, then that box goes still...
-GLITTER_LOOP = 8          # ...except this many, which glint forever
-GLITTER_TRAIL = 3.0       # first glint lands within this many seconds of the box popping in
+# the glitter is one smooth curve: strongest while the name is written (every
+# box glints just behind the reveal wave), then a shower of extra glints that
+# thins out exponentially into a gentle sparkle that loops forever -- no dead
+# gap in between. each glint is a short chain of SMIL <set> steps (dim ->
+# bright -> dim) rather than a CSS keyframe: discrete steps let the browser
+# redraw only when a glint changes. only GLITTER_LOOP boxes loop: looping all
+# of them kept a phone's main thread ~15% busy for as long as the profile
+# stayed open.
+GLITTER_FIELD = 44        # boxes in the wave + shower (the name itself stays calm)
+GLITTER_TRAIL = 3.0       # wave glint lands within this many seconds of the box popping in
+GLITTER_SHOWER = 6.0, 6.0 # extra glints/s as the name finishes, and the decay time (s) of that rate
+GLITTER_LOOP = 12         # extra boxes that keep glinting forever...
+GLITTER_MIN, GLITTER_MAX = 6.0, 10.0   # ...each on its own cycle (s)
 GLITTER_STEPS = [(0.45, 0.35), (1.0, 0.6), (0.45, 0.35)]   # (opacity, seconds)
 FONT = {
     "N": ["#...#", "##..#", "##..#", "#.#.#", "#..##", "#..##", "#...#"],
@@ -251,13 +252,31 @@ def render(data):
     rng = random.Random("glitter")
     field_pos = sorted(occupied - name_pos)
     lit_for = sum(t for _, t in GLITTER_STEPS)
-    for gi, (ci, ri) in enumerate(rng.sample(field_pos, GLITTER_FIELD)):
-        cycle = rng.uniform(GLITTER_MIN, GLITTER_MAX)
-        first = ci * COL_T + ri * ROW_T + CELL_DUR + rng.uniform(0, GLITTER_TRAIL)
-        if gi < GLITTER_LOOP:   # the sample is shuffled, so the loopers are scattered
-            starts = f"{first:.2f}s;g{gi}s{len(GLITTER_STEPS) - 1}.end+{cycle - lit_for:.2f}s"
-        else:
-            starts = ";".join(f"{first + k * cycle:.2f}s" for k in range(GLITTER_PASSES))
+    boxes = rng.sample(field_pos, GLITTER_FIELD + GLITTER_LOOP)   # shuffled -> scattered
+    shower_boxes, loop_boxes = boxes[:GLITTER_FIELD], boxes[GLITTER_FIELD:]
+    # every shower box glints once just behind the wave...
+    glints = [[ci * COL_T + ri * ROW_T + CELL_DUR + rng.uniform(0, GLITTER_TRAIL)] for ci, ri in shower_boxes]
+    # ...then a thinning shower from when the sheen has crossed the name: times
+    # spread evenly over an exponential decay (stratified, so a handful of boxes
+    # can't clump into bursts and gaps), each on a box that's dark at that moment
+    settle = shine_start + sweep
+    rate, decay = GLITTER_SHOWER
+    n = round(rate * decay)
+    for k in range(n):
+        t = settle - decay * math.log(1 - (k + rng.random()) / (n + 1))
+        free = [g for g in glints if all(abs(t - x) > lit_for + 0.3 for x in g)]
+        if free:
+            rng.choice(free).append(t)
+    begins = [";".join(f"{t:.2f}s" for t in sorted(g)) for g in glints]
+    # the loopers are their own boxes, phased evenly from the start so the
+    # steady sparkle is already even when the shower has thinned out
+    mean_cycle = (GLITTER_MIN + GLITTER_MAX) / 2
+    for li in range(GLITTER_LOOP):
+        first = shine_start + (li + rng.random()) * mean_cycle / GLITTER_LOOP
+        gap = rng.uniform(GLITTER_MIN, GLITTER_MAX) - lit_for
+        gi = GLITTER_FIELD + li
+        begins.append(f"{first:.2f}s;g{gi}s{len(GLITTER_STEPS) - 1}.end+{gap:.2f}s")
+    for gi, ((ci, ri), starts) in enumerate(zip(boxes, begins)):
         sets = []
         for si, (op, t) in enumerate(GLITTER_STEPS):
             begin = starts if si == 0 else f"g{gi}s{si - 1}.end"
