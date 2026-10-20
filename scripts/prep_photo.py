@@ -83,11 +83,6 @@ x0, y0 = cx - side // 2, cy - side // 2
 sx0, sy0 = max(x0, 0), max(y0, 0)
 sx1, sy1 = min(x0 + side, out.shape[1]), min(y0 + side, out.shape[0])
 canvas[sy0 - y0:sy1 - y0, sx0 - x0:sx1 - x0] = out[sy0:sy1, sx0:sx1].astype(np.uint8)
-# the cut-out silhouette on the same crop -- portrait3d.py inflates it into depth
-silhouette = np.zeros((side, side), np.uint8)
-silhouette[sy0 - y0:sy1 - y0, sx0 - x0:sx1 - x0] = alpha[sy0:sy1, sx0:sx1]
 
 Image.fromarray(canvas).save(OUT)
-MASK_OUT = os.path.join(os.path.dirname(OUT), "source-mask.png")
-Image.fromarray(silhouette).save(MASK_OUT)
-print("wrote", OUT, "and", MASK_OUT, canvas.shape)
+print("wrote", OUT, canvas.shape)

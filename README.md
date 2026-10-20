@@ -14,19 +14,16 @@
 <!-- ascii portrait (left) + streak/numbers card (right). both svgs are
      840x880 so equal widths give equal heights.
      portrait: python scripts/prep_photo.py <dp.png> && python scripts/make_ascii_svg.py
-     3d page:  python scripts/export_portrait_web.py  (docs/ is served by GitHub Pages)
      stats:    python scripts/render_stats_svg.py (same daily workflow) -->
 
 <h3><code>smnaveen96@github ~ $ whoami</code></h3>
 
 <table>
 <tr>
-<td valign="top"><a href="https://smnaveen96.github.io/smnaveen96/"><img src="./Naveen-ascii.svg" width="420" alt="Naveen — ASCII portrait, gently turning in 3D. Click for the interactive version." /></a></td>
+<td valign="top"><img src="./Naveen-ascii.svg" width="420" alt="Naveen — ASCII portrait" /></td>
 <td valign="top"><img src="./stats.svg" width="420" alt="Naveen's GitHub streak and contribution stats — auto-refreshed daily" /></td>
 </tr>
 </table>
-
-<sub><a href="https://smnaveen96.github.io/smnaveen96/">↻ drag the portrait around in 3D</a></sub>
 
 <br>
 <br>
