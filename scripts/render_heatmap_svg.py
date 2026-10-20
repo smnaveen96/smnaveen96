@@ -55,15 +55,15 @@ LETTER_GAP = 2
 NAME_LAG = 0.06      # name cells trail the wave by a hair so the flash rides its front
 POP_DUR = 0.55
 SHINE_DUR = 0.7
-NAME_GREENS = ["#238f3e", "#26a641", "#1f8a3a"]   # a few steps above the field: readable, not loud
+NAME_GREENS = ["#2cb34d", "#30c452", "#28ad48"]   # a few steps above the field: readable, not loud
 FLASH = "#7ee2a8"
 
 # after the reveal, a handful of boxes glint now and then -- each on its own
 # slow, offset cycle so only one or two are ever lit at once
-GLITTER_FIELD = 26        # field boxes that glint
-GLITTER_NAME = 8          # name boxes that glint (a touch brighter)
+GLITTER_FIELD = 32        # field boxes that glint
+GLITTER_NAME = 10          # name boxes that glint (a touch brighter)
 GLITTER_MIN, GLITTER_MAX = 7.0, 13.0   # cycle length range, seconds
-GLITTER_PEAK = 0.45
+GLITTER_PEAK = 0.6
 FONT = {
     "N": ["#...#", "##..#", "##..#", "#.#.#", "#..##", "#..##", "#...#"],
     "A": [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
@@ -160,7 +160,7 @@ def render(data):
 }}
 @keyframes shine {{
   0%, 100% {{ filter: brightness(1); }}
-  40%      {{ filter: brightness(1.4); }}
+  40%      {{ filter: brightness(1.55); }}
 }}
 .n {{ opacity: 0; transform-box: fill-box; transform-origin: center;
       animation: lit {POP_DUR:.2f}s cubic-bezier(.3,1.4,.5,1) both, shine {SHINE_DUR:.2f}s ease-out both; }}
@@ -235,8 +235,8 @@ def render(data):
     name_pos = [c[:2] for c in cells]
     field_pos = sorted(occupied - set(name_pos))
     settle = shine_start + SHINE_DUR
-    for picks, color in [(rng.sample(field_pos, GLITTER_FIELD), "#2ea043"),
-                         (rng.sample(name_pos, GLITTER_NAME), "#56d364")]:
+    for picks, color in [(rng.sample(field_pos, GLITTER_FIELD), "#3fb950"),
+                         (rng.sample(name_pos, GLITTER_NAME), "#7ee787")]:
         for ci, ri in picks:
             dur = rng.uniform(GLITTER_MIN, GLITTER_MAX)
             parts.append(
