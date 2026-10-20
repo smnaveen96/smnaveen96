@@ -11,7 +11,7 @@
 
 <!-- streak/numbers card: python scripts/render_stats_svg.py (same daily workflow) -->
 
-<img src="./stats.svg" width="420" alt="Naveen's GitHub streak and contribution stats — auto-refreshed daily" />
+<img src="./stats.svg" width="860" alt="Naveen's GitHub streak and contribution stats — auto-refreshed daily" />
 
 <br>
 <br>
@@ -24,9 +24,9 @@
 [![GitHub](https://img.shields.io/badge/GitHub-smnaveen96-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/smnaveen96)
 [![Email](https://img.shields.io/badge/Email-smnaveen96@gmail.com-EA4335?style=for-the-badge&logo=gmail&logoColor=white)](mailto:smnaveen96@gmail.com)
 
-<br>
-<br>
-
-<sub>Profile design and scripts adapted from <a href="https://www.avivashishta.com/blog/build-animated-github-profile-readme">Avi Vashishta's animated GitHub profile README</a> · original by <a href="https://github.com/AVIVASHISHTA29">@AVIVASHISHTA29</a> — thank you!</sub>
+<!-- credit (kept off the rendered page): profile design and scripts adapted from
+     Avi Vashishta's animated GitHub profile README,
+     https://www.avivashishta.com/blog/build-animated-github-profile-readme
+     original by @AVIVASHISHTA29, https://github.com/AVIVASHISHTA29 — thank you! -->
 
 </div>
