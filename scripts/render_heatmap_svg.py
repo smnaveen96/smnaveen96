@@ -65,11 +65,13 @@ NAME_GREENS = ["#2cb34d", "#30c452", "#28ad48"]   # a few steps above the field:
 # slow, offset cycle so only a scattered few are lit at once. each glint is a
 # short chain of SMIL <set> steps (dim -> bright -> dim) rather than a CSS
 # keyframe: discrete steps let the browser redraw only when a glint changes.
-# it stops after GLITTER_PASSES cycles: even stepped, an endless loop kept a
-# phone's main thread ~15% busy for as long as the profile stayed open.
+# most boxes stop after GLITTER_PASSES cycles and only GLITTER_LOOP keep going:
+# even stepped, looping all of them kept a phone's main thread ~15% busy for as
+# long as the profile stayed open.
 GLITTER_FIELD = 44        # field boxes that glint (the name itself stays calm)
 GLITTER_MIN, GLITTER_MAX = 7.0, 13.0   # cycle length range, seconds
-GLITTER_PASSES = 2        # glints per box, then the graph goes still
+GLITTER_PASSES = 2        # glints per box, then that box goes still...
+GLITTER_LOOP = 8          # ...except this many, which glint forever
 GLITTER_TRAIL = 3.0       # first glint lands within this many seconds of the box popping in
 GLITTER_STEPS = [(0.45, 0.35), (1.0, 0.6), (0.45, 0.35)]   # (opacity, seconds)
 FONT = {
@@ -248,10 +250,14 @@ def render(data):
     # glitter -- fixed seed so the daily refresh doesn't reshuffle it
     rng = random.Random("glitter")
     field_pos = sorted(occupied - name_pos)
+    lit_for = sum(t for _, t in GLITTER_STEPS)
     for gi, (ci, ri) in enumerate(rng.sample(field_pos, GLITTER_FIELD)):
         cycle = rng.uniform(GLITTER_MIN, GLITTER_MAX)
         first = ci * COL_T + ri * ROW_T + CELL_DUR + rng.uniform(0, GLITTER_TRAIL)
-        starts = ";".join(f"{first + k * cycle:.2f}s" for k in range(GLITTER_PASSES))
+        if gi < GLITTER_LOOP:   # the sample is shuffled, so the loopers are scattered
+            starts = f"{first:.2f}s;g{gi}s{len(GLITTER_STEPS) - 1}.end+{cycle - lit_for:.2f}s"
+        else:
+            starts = ";".join(f"{first + k * cycle:.2f}s" for k in range(GLITTER_PASSES))
         sets = []
         for si, (op, t) in enumerate(GLITTER_STEPS):
             begin = starts if si == 0 else f"g{gi}s{si - 1}.end"
