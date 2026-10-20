@@ -5,7 +5,7 @@ GitHub-style contribution heatmap SVG: a grid of rounded, colored BOXES in the
 classic 53-week x 7-day calendar on a soft green field, revealed once with a
 diagonal pop-in wave (CSS keyframes, plays on load then freezes) that lights
 the name NAVEEN into the grid as it passes (where it stays), then a sparse,
-slow glitter of a few boxes that keeps going, a Less->More legend, and a real stats footer.
+slow glitter of a few boxes that plays twice and settles, a Less->More legend, and a real stats footer.
 
 Run by .github/workflows/update-profile-art.yml after fetch_contributions.py.
 """
@@ -62,10 +62,12 @@ NAME_GREENS = ["#2cb34d", "#30c452", "#28ad48"]   # a few steps above the field:
 # after the reveal, a handful of boxes glint now and then -- each on its own
 # slow, offset cycle so only a scattered few are lit at once. each glint is a
 # short chain of SMIL <set> steps (dim -> bright -> dim) rather than a CSS
-# keyframe: discrete steps let the browser redraw only when a glint changes,
-# instead of repainting the whole image every frame forever (matters on phones)
+# keyframe: discrete steps let the browser redraw only when a glint changes.
+# it stops after GLITTER_PASSES cycles: even stepped, an endless loop kept a
+# phone's main thread ~15% busy for as long as the profile stayed open.
 GLITTER_FIELD = 44        # field boxes that glint (the name itself stays calm)
 GLITTER_MIN, GLITTER_MAX = 7.0, 13.0   # cycle length range, seconds
+GLITTER_PASSES = 2        # glints per box, then the graph goes still
 GLITTER_STEPS = [(0.45, 0.35), (1.0, 0.6), (0.45, 0.35)]   # (opacity, seconds)
 FONT = {
     "N": ["#...#", "##..#", "##..#", "#.#.#", "#..##", "#..##", "#...#"],
@@ -244,14 +246,13 @@ def render(data):
     rng = random.Random("glitter")
     field_pos = sorted(occupied - name_pos)
     settle = shine_start + sweep
-    lit_for = sum(t for _, t in GLITTER_STEPS)
     for gi, (ci, ri) in enumerate(rng.sample(field_pos, GLITTER_FIELD)):
         cycle = rng.uniform(GLITTER_MIN, GLITTER_MAX)
         first = settle + rng.uniform(0, cycle)
-        last = f"g{gi}s{len(GLITTER_STEPS) - 1}"
+        starts = ";".join(f"{first + k * cycle:.2f}s" for k in range(GLITTER_PASSES))
         sets = []
         for si, (op, t) in enumerate(GLITTER_STEPS):
-            begin = f"{first:.2f}s;{last}.end+{cycle - lit_for:.2f}s" if si == 0 else f"g{gi}s{si - 1}.end"
+            begin = starts if si == 0 else f"g{gi}s{si - 1}.end"
             sets.append(f'<set id="g{gi}s{si}" attributeName="opacity" to="{op}" begin="{begin}" dur="{t}s"/>')
         parts.append(
             f'<rect class="g" x="{grid_left + ci * STEP}" y="{grid_top + ri * STEP}" width="{CELL}" '

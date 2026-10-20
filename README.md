@@ -20,7 +20,7 @@
 
 <table>
 <tr>
-<td valign="top"><img src="./Naveen-ascii.svg?v=3" width="420" alt="Naveen — ASCII portrait" /></td>
+<td valign="top"><img src="./Naveen-ascii.svg?v=4" width="420" alt="Naveen — ASCII portrait" /></td>
 <td valign="top"><img src="./stats.svg" width="420" alt="Naveen's GitHub streak and contribution stats — auto-refreshed daily" /></td>
 </tr>
 </table>

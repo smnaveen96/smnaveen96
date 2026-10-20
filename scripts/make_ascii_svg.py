@@ -8,12 +8,13 @@ portraits look noisy. One fill color + a good density ramp + high contrast (so a
 busy background washes out to blank) reads as neat and legible.
 
 GitHub renders SVGs embedded via <img> and runs their SMIL animations there (JS
-does not run). The rows are revealed by ONE clip path that types row by row (a
-growing block of finished rows + a left-to-right wipe on the current row) with
-a single block cursor riding the wipe -- a handful of animations in total
-rather than one per row, so phones only animate a few values while the
-portrait prints, and nothing at all once it has (the prompt cursor blinks a
-few times, then holds).
+does not run). Each row starts hidden and ONE discrete <set> flips it visible,
+so the portrait prints line by line, top -> bottom, and then holds (the prompt
+cursor blinks a few times). Don't go back to revealing it through an animated
+clip path (the old typing wipe + riding cursor): while anything in the image
+animates, phones repaint the whole clipped block of ~10k glyphs every frame --
+~7x the main-thread work, enough to visibly hang the profile page. Flipping
+whole rows only redraws when a row appears.
 """
 from PIL import Image, ImageEnhance, ImageOps, ImageFilter
 import html
@@ -56,10 +57,9 @@ BG2 = "#111722"
 FRAME = "#30363d"
 TITLE_TEXT = "#7d8590"
 INK = "#c9d1d9"      # the single ascii color (matches Andrew6rant)
-CURSOR = "#c9d1d9"
 
-# ---- reveal timing (one-shot; a cursor rasters top -> bottom) -------------
-REVEAL = 3.8          # whole portrait prints in ~4s at any resolution
+# ---- reveal timing (one-shot; rows appear top -> bottom) -------------------
+REVEAL = 2.4          # whole portrait prints in ~2.5s at any resolution
 ROW_DUR = REVEAL / ROWS
 BLINKS = 6            # prompt cursor blinks this many times, then holds
 
@@ -114,8 +114,10 @@ parts.append(f'<text x="{CANVAS_W/2}" y="{TITLEBAR_H/2 + 4}" fill="{TITLE_TEXT}"
 
 # one <text> per row (single color -> no per-char markup, tiny file). leading
 # and trailing blanks are trimmed: the row starts at its first character and
-# textLength keeps every glyph on the same CELL_W grid.
+# textLength keeps every glyph on the same CELL_W grid. unless STATIC, each row
+# is hidden until its own <set> shows it.
 font_size = CELL_H * 0.86
+hidden = "" if STATIC else ' visibility="hidden"'
 text_rows = []
 for ry, line in enumerate(rows_txt):
     body = line.strip(" ")
@@ -123,37 +125,13 @@ for ry, line in enumerate(rows_txt):
         continue
     lead = len(line) - len(line.lstrip(" "))
     y = art_top + ry * CELL_H + CELL_H * 0.74
+    show = "" if STATIC else f'<set attributeName="visibility" to="visible" begin="{ry * ROW_DUR:.2f}s"/>'
     text_rows.append(
         f'<text xml:space="preserve" x="{PAD + lead * CELL_W:.1f}" y="{y:.1f}" '
-        f'textLength="{len(body) * CELL_W:.1f}" lengthAdjust="spacing">{html.escape(body)}</text>'
+        f'textLength="{len(body) * CELL_W:.1f}" lengthAdjust="spacing"{hidden}>{html.escape(body)}{show}</text>'
     )
 group = f'fill="{INK}" font-size="{font_size:.1f}"'
-
-if STATIC:
-    parts.append(f'<g {group}>{"".join(text_rows)}</g>')
-else:
-    row_ys = ";".join(f"{art_top + r * CELL_H:.1f}" for r in range(ROWS))
-    done_hs = ";".join(f"{r * CELL_H:.1f}" for r in range(ROWS))
-    parts.append(
-        '<defs><clipPath id="type">'
-        # rows already printed
-        f'<rect x="{PAD}" y="{art_top:.1f}" width="{ART_W}" height="0">'
-        f'<animate attributeName="height" values="{done_hs}" calcMode="discrete" dur="{REVEAL}s" fill="freeze"/></rect>'
-        # the row being typed
-        f'<rect x="{PAD}" y="{art_top:.1f}" width="0" height="{CELL_H:.2f}">'
-        f'<animate attributeName="y" values="{row_ys}" calcMode="discrete" dur="{REVEAL}s" fill="freeze"/>'
-        f'<animate attributeName="width" from="0" to="{ART_W}" dur="{ROW_DUR:.4f}s" repeatCount="{ROWS}" fill="freeze"/></rect>'
-        '</clipPath></defs>'
-    )
-    parts.append(f'<g {group} clip-path="url(#type)">{"".join(text_rows)}</g>')
-    # the typing cursor rides the wipe edge, then disappears
-    parts.append(
-        f'<rect x="{PAD}" y="{art_top + 1:.1f}" width="{CELL_W:.2f}" height="{CELL_H - 2:.2f}" fill="{CURSOR}" opacity="0.85">'
-        f'<animate attributeName="x" from="{PAD}" to="{PAD + ART_W}" dur="{ROW_DUR:.4f}s" repeatCount="{ROWS}" fill="freeze"/>'
-        f'<animate attributeName="y" values="{";".join(f"{art_top + r * CELL_H + 1:.1f}" for r in range(ROWS))}" '
-        f'calcMode="discrete" dur="{REVEAL}s" fill="freeze"/>'
-        f'<set attributeName="opacity" to="0" begin="{REVEAL}s"/></rect>'
-    )
+parts.append(f'<g {group}>{"".join(text_rows)}</g>')
 
 # status bar with a prompt cursor that blinks a few times, then holds
 status_line_y = TITLEBAR_H + ART_H + PAD * 0.35
