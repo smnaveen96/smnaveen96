@@ -2,16 +2,17 @@
 """
 Render data/contributions.json (produced by fetch_contributions.py) as a proper
 GitHub-style contribution heatmap SVG: a grid of rounded, colored BOXES in the
-classic 53-week x 7-day calendar, revealed once with a diagonal line-after-line
-pop-in (CSS keyframes, plays on load then freezes), the name NAVEEN lit up
-letter by letter into the grid where it stays, a Less->More legend, and a real
-stats footer.
+classic 53-week x 7-day calendar on a soft green field, revealed once with a
+diagonal pop-in wave (CSS keyframes, plays on load then freezes) that lights
+the name NAVEEN into the grid as it passes (where it stays), a Less->More
+legend, and a real stats footer.
 
 Run by .github/workflows/update-profile-art.yml after fetch_contributions.py.
 """
 import datetime
 import json
 import os
+import random
 
 HERE = os.path.dirname(__file__)
 IN_PATH = os.path.join(HERE, "..", "data", "contributions.json")
@@ -38,19 +39,20 @@ GREEN = "#39d353"
 GOLD = "#f2cc60"
 
 # reveal timing (one-shot)
-COL_T = 0.018   # per-column delay contribution (left -> right sweep)
+COL_T = 0.03    # per-column delay contribution (left -> right sweep)
 ROW_T = 0.045   # per-row delay contribution (top -> bottom cascade)
 CELL_DUR = 0.5
 
-# the name, drawn into the grid in a 5x7 pixel font once the reveal settles.
-# letters light up one after another (each cell pops in with a pale flash and
-# settles to green), a single shine runs across the word, and it stays lit.
+# empty days get a soft, varied dark-green texture instead of black, so the
+# name sits in a field of green rather than shouting off a black grid
+FIELD_GREENS = ["#0d3a22", "#0e4429", "#0e4429", "#104a2d", "#12532f", "#145c33"]
+
+# the name, drawn into the grid in a 5x7 pixel font. its cells pop in with the
+# reveal wave itself (pale flash, slight bounce, settle to green), a single
+# shine runs across the word once the wave has passed, and it stays lit.
 NAME = "NAVEEN"
 LETTER_GAP = 2
-NAME_START = 1.9     # seconds -- as the reveal wave finishes
-LETTER_T = 0.32      # delay between letters
-STROKE_T = 0.05      # per-column delay inside a letter (drawn left -> right)
-DOT_T = 0.025        # per-row delay inside a letter
+NAME_LAG = 0.06      # name cells trail the wave by a hair so the flash rides its front
 POP_DUR = 0.55
 SHINE_DUR = 0.7
 NAME_GREENS = ["#39d353", "#4ade6a", "#2fc94a"]   # slight variation reads as real cells
@@ -72,8 +74,8 @@ def name_cells(n_cols):
         for ri, line in enumerate(FONT[ch]):
             for ci, px in enumerate(line):
                 if px == "#":
-                    delay = NAME_START + li * LETTER_T + ci * STROKE_T + ri * DOT_T
-                    cells.append((left + li * pitch + ci, ri, delay))
+                    col = left + li * pitch + ci
+                    cells.append((col, ri, col * COL_T + ri * ROW_T + NAME_LAG))
     return cells
 
 
@@ -197,9 +199,10 @@ def render(data):
             gy = grid_top + ri * STEP
             delay = ci * COL_T + ri * ROW_T
             plural = "s" if count != 1 else ""
+            fill = PALETTE[lvl] if lvl else random.Random(date_s).choice(FIELD_GREENS)
             parts.append(
                 f'<rect class="c" x="{gx}" y="{gy}" width="{CELL}" height="{CELL}" rx="2.5" '
-                f'fill="{PALETTE[lvl]}" style="animation-delay:{delay:.3f}s">'
+                f'fill="{fill}" style="animation-delay:{delay:.3f}s">'
                 f'<title>{date_s}: {count} contribution{plural}</title></rect>'
             )
 
