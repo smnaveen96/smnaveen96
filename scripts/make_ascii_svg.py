@@ -8,9 +8,12 @@ portraits look noisy. One fill color + a good density ramp + high contrast (so a
 busy background washes out to blank) reads as neat and legible.
 
 GitHub renders SVGs embedded via <img> and runs their SMIL animations there (JS
-does not run). Each row is revealed with a left-to-right clip wipe plus a small
-block cursor riding the wipe edge, staggered top -> bottom, so the whole
-portrait prints once and freezes.
+does not run). The rows are revealed by ONE clip path that types row by row (a
+growing block of finished rows + a left-to-right wipe on the current row) with
+a single block cursor riding the wipe -- a handful of animations in total
+rather than one per row, so phones only animate a few values while the
+portrait prints, and nothing at all once it has (the prompt cursor blinks a
+few times, then holds).
 """
 from PIL import Image, ImageEnhance, ImageOps, ImageFilter
 import html
@@ -56,8 +59,9 @@ INK = "#c9d1d9"      # the single ascii color (matches Andrew6rant)
 CURSOR = "#c9d1d9"
 
 # ---- reveal timing (one-shot; a cursor rasters top -> bottom) -------------
-ROW_DUR = 5.8 / ROWS  # whole portrait prints in ~6s at any resolution
-STAGGER = ROW_DUR       # == ROW_DUR -> a single cursor sweeping down
+REVEAL = 3.8          # whole portrait prints in ~4s at any resolution
+ROW_DUR = REVEAL / ROWS
+BLINKS = 6            # prompt cursor blinks this many times, then holds
 
 # ---- 1. sample the image into a COLS x ROWS grayscale grid ----------------
 im = Image.open(SRC).convert("L")               # grayscale
@@ -108,35 +112,50 @@ for i, dotcol in enumerate(["#ff5f56", "#ffbd2e", "#27c93f"]):
 parts.append(f'<text x="{CANVAS_W/2}" y="{TITLEBAR_H/2 + 4}" fill="{TITLE_TEXT}" font-size="12" '
              f'text-anchor="middle">smnaveen96@github: ~$ ./portrait.sh</text>')
 
-# one <text> per row (single color -> no per-char markup, tiny file)
+# one <text> per row (single color -> no per-char markup, tiny file). leading
+# and trailing blanks are trimmed: the row starts at its first character and
+# textLength keeps every glyph on the same CELL_W grid.
 font_size = CELL_H * 0.86
+text_rows = []
 for ry, line in enumerate(rows_txt):
-    y = art_top + ry * CELL_H + CELL_H * 0.74
-    row_y = art_top + ry * CELL_H
-    delay = ry * STAGGER
-    safe = html.escape(line)
-    text = (f'<text xml:space="preserve" x="{PAD}" y="{y:.1f}" fill="{INK}" '
-            f'font-size="{font_size:.1f}" textLength="{ART_W}" lengthAdjust="spacing">{safe}</text>')
-
-    if STATIC:
-        parts.append(text)
+    body = line.strip(" ")
+    if not body:
         continue
-
-    parts.append(
-        f'<clipPath id="r{ry}"><rect x="{PAD}" y="{row_y:.1f}" height="{CELL_H}" width="0">'
-        f'<animate attributeName="width" from="0" to="{ART_W}" begin="{delay:.3f}s" '
-        f'dur="{ROW_DUR:.2f}s" fill="freeze"/></rect></clipPath>'
+    lead = len(line) - len(line.lstrip(" "))
+    y = art_top + ry * CELL_H + CELL_H * 0.74
+    text_rows.append(
+        f'<text xml:space="preserve" x="{PAD + lead * CELL_W:.1f}" y="{y:.1f}" '
+        f'textLength="{len(body) * CELL_W:.1f}" lengthAdjust="spacing">{html.escape(body)}</text>'
     )
-    parts.append(f'<g clip-path="url(#r{ry})">{text}</g>')
+group = f'fill="{INK}" font-size="{font_size:.1f}"'
+
+if STATIC:
+    parts.append(f'<g {group}>{"".join(text_rows)}</g>')
+else:
+    row_ys = ";".join(f"{art_top + r * CELL_H:.1f}" for r in range(ROWS))
+    done_hs = ";".join(f"{r * CELL_H:.1f}" for r in range(ROWS))
     parts.append(
-        f'<rect y="{row_y+1:.1f}" width="{CELL_W}" height="{CELL_H-2}" fill="{CURSOR}" opacity="0">'
-        f'<animate attributeName="x" from="{PAD}" to="{PAD+ART_W}" begin="{delay:.3f}s" '
-        f'dur="{ROW_DUR:.2f}s" fill="freeze"/>'
-        f'<set attributeName="opacity" to="0.85" begin="{delay:.3f}s"/>'
-        f'<set attributeName="opacity" to="0" begin="{delay+ROW_DUR:.3f}s"/></rect>'
+        '<defs><clipPath id="type">'
+        # rows already printed
+        f'<rect x="{PAD}" y="{art_top:.1f}" width="{ART_W}" height="0">'
+        f'<animate attributeName="height" values="{done_hs}" calcMode="discrete" dur="{REVEAL}s" fill="freeze"/></rect>'
+        # the row being typed
+        f'<rect x="{PAD}" y="{art_top:.1f}" width="0" height="{CELL_H:.2f}">'
+        f'<animate attributeName="y" values="{row_ys}" calcMode="discrete" dur="{REVEAL}s" fill="freeze"/>'
+        f'<animate attributeName="width" from="0" to="{ART_W}" dur="{ROW_DUR:.4f}s" repeatCount="{ROWS}" fill="freeze"/></rect>'
+        '</clipPath></defs>'
+    )
+    parts.append(f'<g {group} clip-path="url(#type)">{"".join(text_rows)}</g>')
+    # the typing cursor rides the wipe edge, then disappears
+    parts.append(
+        f'<rect x="{PAD}" y="{art_top + 1:.1f}" width="{CELL_W:.2f}" height="{CELL_H - 2:.2f}" fill="{CURSOR}" opacity="0.85">'
+        f'<animate attributeName="x" from="{PAD}" to="{PAD + ART_W}" dur="{ROW_DUR:.4f}s" repeatCount="{ROWS}" fill="freeze"/>'
+        f'<animate attributeName="y" values="{";".join(f"{art_top + r * CELL_H + 1:.1f}" for r in range(ROWS))}" '
+        f'calcMode="discrete" dur="{REVEAL}s" fill="freeze"/>'
+        f'<set attributeName="opacity" to="0" begin="{REVEAL}s"/></rect>'
     )
 
-# status bar with a steady blinking cursor
+# status bar with a prompt cursor that blinks a few times, then holds
 status_line_y = TITLEBAR_H + ART_H + PAD * 0.35
 status_y = status_line_y + 19
 parts.append(f'<line x1="0" y1="{status_line_y:.1f}" x2="{CANVAS_W}" y2="{status_line_y:.1f}" stroke="{FRAME}"/>')
@@ -144,8 +163,8 @@ parts.append(f'<text x="{PAD}" y="{status_y:.1f}" fill="{TITLE_TEXT}" font-size=
              f'smnaveen96@github:~$ whoami <tspan fill="{INK}">Naveen</tspan></text>')
 status_chars = len("smnaveen96@github:~$ whoami Naveen ")   # cursor sits after the name
 parts.append(f'<rect x="{PAD + status_chars * 13 * 0.6:.1f}" y="{status_y-12:.1f}" width="8" height="14" fill="{INK}">'
-             f'<animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.5;0.51;1" '
-             f'dur="1s" repeatCount="indefinite"/></rect>')
+             f'<animate attributeName="opacity" values="1;0;1" keyTimes="0;0.5;1" calcMode="discrete" '
+             f'dur="1s" begin="{REVEAL}s" repeatCount="{BLINKS}" fill="freeze"/></rect>')
 
 parts.append("</svg>")
 svg = "".join(parts)

@@ -53,17 +53,20 @@ FIELD_GREENS = ["#0d3a22", "#0e4429", "#0e4429", "#104a2d", "#12532f", "#145c33"
 NAME = "NAVEEN"
 LETTER_GAP = 2
 POP_DUR = 0.55
-SHINE_DUR = 0.6
-SHINE_COL_T = 0.04    # left -> right travel of the sheen across the word
+SHINE_BAND = 225      # px width of the soft sheen band that sweeps across the word
+SHINE_SPEED = 375     # px / s
 SHINE_FILL = "#b4f5c0"
 SHINE_PEAK = 0.35
 NAME_GREENS = ["#2cb34d", "#30c452", "#28ad48"]   # a few steps above the field: readable, not loud
 
 # after the reveal, a handful of boxes glint now and then -- each on its own
-# slow, offset cycle so only a scattered few are lit at once
+# slow, offset cycle so only a scattered few are lit at once. each glint is a
+# short chain of SMIL <set> steps (dim -> bright -> dim) rather than a CSS
+# keyframe: discrete steps let the browser redraw only when a glint changes,
+# instead of repainting the whole image every frame forever (matters on phones)
 GLITTER_FIELD = 44        # field boxes that glint (the name itself stays calm)
 GLITTER_MIN, GLITTER_MAX = 7.0, 13.0   # cycle length range, seconds
-GLITTER_PEAK = 1.0
+GLITTER_STEPS = [(0.45, 0.35), (1.0, 0.6), (0.45, 0.35)]   # (opacity, seconds)
 FONT = {
     "N": ["#...#", "##..#", "##..#", "#.#.#", "#..##", "#..##", "#...#"],
     "A": [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
@@ -158,19 +161,8 @@ def render(data):
   55%  {{ opacity: 1; transform: scale(1.22); }}
   100% {{ opacity: 1; transform: scale(1); }}
 }}
-@keyframes shine {{
-  0%, 100% {{ opacity: 0; }}
-  40%      {{ opacity: {SHINE_PEAK}; }}
-}}
 .n {{ opacity: 0; transform-box: fill-box; transform-origin: center;
       animation: lit {POP_DUR:.2f}s cubic-bezier(.3,1.4,.5,1) both; }}
-.s {{ opacity: 0; animation: shine {SHINE_DUR:.2f}s ease-in-out both; pointer-events: none; }}
-@keyframes glint {{
-  0%, 100% {{ opacity: 0; }}
-  7%       {{ opacity: {GLITTER_PEAK}; }}
-  18%      {{ opacity: 0; }}
-}}
-.g {{ opacity: 0; animation: glint linear infinite; pointer-events: none; }}
 @media (prefers-reduced-motion: reduce) {{ .c, .n {{ opacity: 1; transform: none; animation: none; }} .g, .s {{ display: none; }} }}
 """.strip()
 
@@ -203,49 +195,67 @@ def render(data):
         y = grid_top + wi * STEP + CELL * 0.78
         parts.append(f'<text x="{PAD}" y="{y:.1f}" fill="{MUTED}" font-size="9">{wname}</text>')
 
-    # the boxes -- each a rounded rect, diagonal slide-down reveal (once, freeze)
+    occupied = {(ci, ri) for ci, column in enumerate(grid) for ri, cell in enumerate(column) if cell}
+    cells = [c for c in name_cells(n_cols) if c[:2] in occupied]
+    name_pos = {c[:2] for c in cells}
+
+    # the boxes -- each a rounded rect, diagonal pop-in reveal (once, freeze).
+    # boxes under the name are skipped: the name's own boxes cover them.
+    # (no <title> tooltips -- an svg shown as an <img> never gets hover)
     for ci, column in enumerate(grid):
         gx = grid_left + ci * STEP
         for ri, cell in enumerate(column):
-            if cell is None:
+            if cell is None or (ci, ri) in name_pos:
                 continue
             date_s, count, lvl = cell
             gy = grid_top + ri * STEP
             delay = ci * COL_T + ri * ROW_T
-            plural = "s" if count != 1 else ""
             fill = PALETTE[lvl] if lvl else random.Random(date_s).choice(FIELD_GREENS)
             parts.append(
                 f'<rect class="c" x="{gx}" y="{gy}" width="{CELL}" height="{CELL}" rx="2.5" '
-                f'fill="{fill}" style="animation-delay:{delay:.3f}s">'
-                f'<title>{date_s}: {count} contribution{plural}</title></rect>'
+                f'fill="{fill}" style="animation-delay:{delay:.3f}s"/>'
             )
 
-    # the name -- lit cells on top of the real boxes; they light up once and stay
-    occupied = {(ci, ri) for ci, column in enumerate(grid) for ri, cell in enumerate(column) if cell}
-    cells = [c for c in name_cells(n_cols) if c[:2] in occupied]
-    shine_start = max(d for _, _, d in cells) + POP_DUR
+    # the name -- its own boxes, popping in with the wave; they light up once and stay
+    name_rects = []
     for ci, ri, delay in cells:
-        shine = shine_start + (ci - cells[0][0]) * SHINE_COL_T
-        parts.append(
-            f'<rect class="n" x="{grid_left + ci * STEP}" y="{grid_top + ri * STEP}" width="{CELL}" height="{CELL}" '
-            f'rx="2.5" fill="{NAME_GREENS[(ci * 7 + ri) % 3]}" style="animation-delay:{delay:.3f}s"/>'
-        )
-        # sheen: a pale layer over the cell that fades up and away once, travelling left -> right
-        parts.append(
-            f'<rect class="s" x="{grid_left + ci * STEP}" y="{grid_top + ri * STEP}" width="{CELL}" height="{CELL}" '
-            f'rx="2.5" fill="{SHINE_FILL}" style="animation-delay:{shine:.3f}s"/>'
-        )
+        xy = f'x="{grid_left + ci * STEP}" y="{grid_top + ri * STEP}" width="{CELL}" height="{CELL}" rx="2.5"'
+        name_rects.append(f'<rect {xy}/>')
+        parts.append(f'<rect class="n" {xy} fill="{NAME_GREENS[(ci * 7 + ri) % 3]}" '
+                     f'style="animation-delay:{delay:.3f}s"/>')
+
+    # sheen: one soft gradient band, clipped to the name's boxes, swept across once
+    shine_start = max(d for _, _, d in cells) + POP_DUR
+    name_l = grid_left + min(c[0] for c in cells) * STEP
+    name_r = grid_left + (max(c[0] for c in cells) + 1) * STEP
+    sweep = (name_r - name_l + SHINE_BAND) / SHINE_SPEED
+    parts.append(
+        f'<defs><clipPath id="nm">{"".join(name_rects)}</clipPath>'
+        f'<linearGradient id="sh"><stop offset="0" stop-color="{SHINE_FILL}" stop-opacity="0"/>'
+        f'<stop offset=".6" stop-color="{SHINE_FILL}" stop-opacity="{SHINE_PEAK}"/>'
+        f'<stop offset="1" stop-color="{SHINE_FILL}" stop-opacity="0"/></linearGradient></defs>'
+        f'<rect class="s" x="{name_l - SHINE_BAND}" y="{grid_top}" width="{SHINE_BAND}" height="{7 * STEP}" '
+        f'fill="url(#sh)" clip-path="url(#nm)">'
+        f'<animate attributeName="x" from="{name_l - SHINE_BAND}" to="{name_r}" begin="{shine_start:.2f}s" '
+        f'dur="{sweep:.2f}s" fill="freeze"/></rect>'
+    )
 
     # glitter -- fixed seed so the daily refresh doesn't reshuffle it
     rng = random.Random("glitter")
-    field_pos = sorted(occupied - {c[:2] for c in cells})
-    settle = shine + SHINE_DUR
-    for ci, ri in rng.sample(field_pos, GLITTER_FIELD):
-        dur = rng.uniform(GLITTER_MIN, GLITTER_MAX)
+    field_pos = sorted(occupied - name_pos)
+    settle = shine_start + sweep
+    lit_for = sum(t for _, t in GLITTER_STEPS)
+    for gi, (ci, ri) in enumerate(rng.sample(field_pos, GLITTER_FIELD)):
+        cycle = rng.uniform(GLITTER_MIN, GLITTER_MAX)
+        first = settle + rng.uniform(0, cycle)
+        last = f"g{gi}s{len(GLITTER_STEPS) - 1}"
+        sets = []
+        for si, (op, t) in enumerate(GLITTER_STEPS):
+            begin = f"{first:.2f}s;{last}.end+{cycle - lit_for:.2f}s" if si == 0 else f"g{gi}s{si - 1}.end"
+            sets.append(f'<set id="g{gi}s{si}" attributeName="opacity" to="{op}" begin="{begin}" dur="{t}s"/>')
         parts.append(
             f'<rect class="g" x="{grid_left + ci * STEP}" y="{grid_top + ri * STEP}" width="{CELL}" '
-            f'height="{CELL}" rx="2.5" fill="#6ee07f" '
-            f'style="animation-duration:{dur:.2f}s;animation-delay:{settle + rng.uniform(0, dur):.2f}s"/>'
+            f'height="{CELL}" rx="2.5" fill="#6ee07f" opacity="0">{"".join(sets)}</rect>'
         )
 
     # legend: Less [][][][][] More (bottom-right of the grid)

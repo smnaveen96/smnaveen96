@@ -20,7 +20,7 @@
 
 <table>
 <tr>
-<td valign="top"><img src="./Naveen-ascii.svg?v=2" width="420" alt="Naveen — ASCII portrait" /></td>
+<td valign="top"><img src="./Naveen-ascii.svg?v=3" width="420" alt="Naveen — ASCII portrait" /></td>
 <td valign="top"><img src="./stats.svg" width="420" alt="Naveen's GitHub streak and contribution stats — auto-refreshed daily" /></td>
 </tr>
 </table>
@@ -39,5 +39,8 @@
 [![Email](https://img.shields.io/badge/Email-smnaveen96@gmail.com-EA4335?style=for-the-badge&logo=gmail&logoColor=white)](mailto:smnaveen96@gmail.com)
 
 <br>
+<br>
+
+<sub>Profile design and scripts adapted from <a href="https://www.avivashishta.com/blog/build-animated-github-profile-readme">Avi Vashishta's animated GitHub profile README</a> · original by <a href="https://github.com/AVIVASHISHTA29">@AVIVASHISHTA29</a> — thank you!</sub>
 
 </div>
