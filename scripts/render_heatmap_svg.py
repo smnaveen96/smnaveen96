@@ -5,7 +5,8 @@ GitHub-style contribution heatmap SVG: a grid of rounded, colored BOXES in the
 classic 53-week x 7-day calendar on a soft green field, revealed once with a
 diagonal pop-in wave (CSS keyframes, plays on load then freezes) that lights
 the name NAVEEN into the grid as it passes (where it stays), then a sparse,
-slow glitter of a few boxes that plays twice and settles, a Less->More legend, and a real stats footer.
+slow glitter of a few boxes that trails the wave, plays once more and settles,
+a Less->More legend, and a real stats footer.
 
 Run by .github/workflows/update-profile-art.yml after fetch_contributions.py.
 """
@@ -59,7 +60,8 @@ SHINE_FILL = "#b4f5c0"
 SHINE_PEAK = 0.35
 NAME_GREENS = ["#2cb34d", "#30c452", "#28ad48"]   # a few steps above the field: readable, not loud
 
-# after the reveal, a handful of boxes glint now and then -- each on its own
+# a handful of boxes glint just behind the reveal wave, so the sparkle flows in
+# while the name is being written, then once more later -- each on its own
 # slow, offset cycle so only a scattered few are lit at once. each glint is a
 # short chain of SMIL <set> steps (dim -> bright -> dim) rather than a CSS
 # keyframe: discrete steps let the browser redraw only when a glint changes.
@@ -68,6 +70,7 @@ NAME_GREENS = ["#2cb34d", "#30c452", "#28ad48"]   # a few steps above the field:
 GLITTER_FIELD = 44        # field boxes that glint (the name itself stays calm)
 GLITTER_MIN, GLITTER_MAX = 7.0, 13.0   # cycle length range, seconds
 GLITTER_PASSES = 2        # glints per box, then the graph goes still
+GLITTER_TRAIL = 3.0       # first glint lands within this many seconds of the box popping in
 GLITTER_STEPS = [(0.45, 0.35), (1.0, 0.6), (0.45, 0.35)]   # (opacity, seconds)
 FONT = {
     "N": ["#...#", "##..#", "##..#", "#.#.#", "#..##", "#..##", "#...#"],
@@ -245,10 +248,9 @@ def render(data):
     # glitter -- fixed seed so the daily refresh doesn't reshuffle it
     rng = random.Random("glitter")
     field_pos = sorted(occupied - name_pos)
-    settle = shine_start + sweep
     for gi, (ci, ri) in enumerate(rng.sample(field_pos, GLITTER_FIELD)):
         cycle = rng.uniform(GLITTER_MIN, GLITTER_MAX)
-        first = settle + rng.uniform(0, cycle)
+        first = ci * COL_T + ri * ROW_T + CELL_DUR + rng.uniform(0, GLITTER_TRAIL)
         starts = ";".join(f"{first + k * cycle:.2f}s" for k in range(GLITTER_PASSES))
         sets = []
         for si, (op, t) in enumerate(GLITTER_STEPS):

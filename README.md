@@ -11,7 +11,7 @@
 
 <!-- streak/numbers card: python scripts/render_stats_svg.py (same daily workflow) -->
 
-<img src="./stats.svg" width="860" alt="Naveen's GitHub streak and contribution stats — auto-refreshed daily" />
+<img src="./stats.svg?v=2" width="860" alt="Naveen's GitHub streak and contribution stats — auto-refreshed daily" />
 
 <br>
 <br>
