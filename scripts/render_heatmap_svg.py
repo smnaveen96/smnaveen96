@@ -3,9 +3,9 @@
 Render data/contributions.json (produced by fetch_contributions.py) as a proper
 GitHub-style contribution heatmap SVG: a grid of rounded, colored BOXES in the
 classic 53-week x 7-day calendar, revealed once with a diagonal line-after-line
-slide-down (CSS keyframes, plays on load then freezes), the name NAVEEN softly
-written into the grid every few seconds, a Less->More legend, and a real stats
-footer.
+pop-in (CSS keyframes, plays on load then freezes), the name NAVEEN lit up
+letter by letter into the grid where it stays, a Less->More legend, and a real
+stats footer.
 
 Run by .github/workflows/update-profile-art.yml after fetch_contributions.py.
 """
@@ -40,16 +40,21 @@ GOLD = "#f2cc60"
 # reveal timing (one-shot)
 COL_T = 0.018   # per-column delay contribution (left -> right sweep)
 ROW_T = 0.045   # per-row delay contribution (top -> bottom cascade)
-CELL_DUR = 0.42
+CELL_DUR = 0.5
 
-# the name, drawn into the grid in a 5x7 pixel font once the reveal settles:
-# a soft glow that writes left -> right, holds, then fades back to the real data
+# the name, drawn into the grid in a 5x7 pixel font once the reveal settles.
+# letters light up one after another (each cell pops in with a pale flash and
+# settles to green), a single shine runs across the word, and it stays lit.
 NAME = "NAVEEN"
-NAME_START = 2.2    # seconds -- just after the reveal finishes
-NAME_CYCLE = 12.0   # repeat period; most of it is the plain graph
-NAME_COL_T = 0.035  # per-column stagger of the glow
-NAME_FILL = "#7ee2a8"
-NAME_PEAK = 0.38
+LETTER_GAP = 2
+NAME_START = 1.9     # seconds -- as the reveal wave finishes
+LETTER_T = 0.32      # delay between letters
+STROKE_T = 0.05      # per-column delay inside a letter (drawn left -> right)
+DOT_T = 0.025        # per-row delay inside a letter
+POP_DUR = 0.55
+SHINE_DUR = 0.7
+NAME_GREENS = ["#39d353", "#4ade6a", "#2fc94a"]   # slight variation reads as real cells
+FLASH = "#c8ffcf"
 FONT = {
     "N": ["#...#", "##..#", "##..#", "#.#.#", "#..##", "#..##", "#...#"],
     "A": [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
@@ -59,15 +64,16 @@ FONT = {
 
 
 def name_cells(n_cols):
-    """(col, row) grid positions spelling NAME, centred horizontally."""
-    width = len(NAME) * 6 - 1
-    left = (n_cols - width) // 2
+    """(col, row, delay) for each cell spelling NAME, centred horizontally."""
+    pitch = 5 + LETTER_GAP
+    left = (n_cols - (len(NAME) * pitch - LETTER_GAP)) // 2
     cells = []
     for li, ch in enumerate(NAME):
         for ri, line in enumerate(FONT[ch]):
             for ci, px in enumerate(line):
                 if px == "#":
-                    cells.append((left + li * 6 + ci, ri))
+                    delay = NAME_START + li * LETTER_T + ci * STROKE_T + ri * DOT_T
+                    cells.append((left + li * pitch + ci, ri, delay))
     return cells
 
 
@@ -132,19 +138,24 @@ def render(data):
 
     css = f"""
 @keyframes cell {{
-  0%   {{ opacity: 0; transform: translateY(-6px); }}
-  100% {{ opacity: 1; transform: translateY(0); }}
+  0%   {{ opacity: 0; transform: scale(.3); }}
+  65%  {{ opacity: 1; transform: scale(1.08); }}
+  100% {{ opacity: 1; transform: scale(1); }}
 }}
-.c {{ opacity: 0; animation: cell {CELL_DUR:.2f}s cubic-bezier(.2,.8,.2,1) both; }}
-@keyframes name {{
-  0%   {{ opacity: 0; }}
-  6%   {{ opacity: {NAME_PEAK}; }}
-  32%  {{ opacity: {NAME_PEAK}; }}
-  42%  {{ opacity: 0; }}
-  100% {{ opacity: 0; }}
+.c {{ opacity: 0; transform-box: fill-box; transform-origin: center;
+      animation: cell {CELL_DUR:.2f}s cubic-bezier(.2,.8,.2,1) both; }}
+@keyframes lit {{
+  0%   {{ opacity: 0; transform: scale(.2); fill: {FLASH}; }}
+  55%  {{ opacity: 1; transform: scale(1.22); fill: {FLASH}; }}
+  100% {{ opacity: 1; transform: scale(1); }}
 }}
-.n {{ opacity: 0; animation: name {NAME_CYCLE:.0f}s ease-in-out infinite; }}
-@media (prefers-reduced-motion: reduce) {{ .c {{ opacity: 1; animation: none; }} .n {{ display: none; }} }}
+@keyframes shine {{
+  0%, 100% {{ filter: brightness(1); }}
+  40%      {{ filter: brightness(1.75); }}
+}}
+.n {{ opacity: 0; transform-box: fill-box; transform-origin: center;
+      animation: lit {POP_DUR:.2f}s cubic-bezier(.3,1.4,.5,1) both, shine {SHINE_DUR:.2f}s ease-out both; }}
+@media (prefers-reduced-motion: reduce) {{ .c, .n {{ opacity: 1; transform: none; animation: none; }} }}
 """.strip()
 
     parts = [
@@ -192,15 +203,15 @@ def render(data):
                 f'<title>{date_s}: {count} contribution{plural}</title></rect>'
             )
 
-    # the name overlay -- sits on top of the boxes, invisible except during its glow
+    # the name -- lit cells on top of the real boxes; they light up once and stay
     occupied = {(ci, ri) for ci, column in enumerate(grid) for ri, cell in enumerate(column) if cell}
-    for ci, ri in name_cells(n_cols):
-        if (ci, ri) not in occupied:
-            continue
-        delay = NAME_START + ci * NAME_COL_T
+    cells = [c for c in name_cells(n_cols) if c[:2] in occupied]
+    shine_start = max(d for _, _, d in cells) + POP_DUR
+    for ci, ri, delay in cells:
+        shine = shine_start + (ci - cells[0][0]) * 0.02
         parts.append(
             f'<rect class="n" x="{grid_left + ci * STEP}" y="{grid_top + ri * STEP}" width="{CELL}" height="{CELL}" '
-            f'rx="2.5" fill="{NAME_FILL}" style="animation-delay:{delay:.3f}s"/>'
+            f'rx="2.5" fill="{NAME_GREENS[(ci * 7 + ri) % 3]}" style="animation-delay:{delay:.3f}s,{shine:.3f}s"/>'
         )
 
     # legend: Less [][][][][] More (bottom-right of the grid)
