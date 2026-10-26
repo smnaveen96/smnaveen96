@@ -1,22 +1,22 @@
 {
   "username": "smnaveen96",
-  "generated_at": "2026-10-25T11:33:40Z",
+  "generated_at": "2026-10-26T13:07:09Z",
   "range": {
     "start": "2025-10-26",
+    "end": "2026-10-26"
+  },
+  "total_contributions": 75,
+  "active_days": 13,
+  "avg_per_active_day": 5.8,
+  "current_streak": {
+    "length": 6,
+    "start": "2026-10-20",
     "end": "2026-10-25"
   },
-  "total_contributions": 74,
-  "active_days": 12,
-  "avg_per_active_day": 6.2,
-  "current_streak": {
-    "length": 5,
-    "start": "2026-10-20",
-    "end": "2026-10-24"
-  },
   "longest_streak": {
-    "length": 5,
+    "length": 6,
     "start": "2026-10-20",
-    "end": "2026-10-24"
+    "end": "2026-10-25"
   },
   "best_day": {
     "date": "2026-10-20",
@@ -73,7 +73,7 @@
     },
     {
       "month": "2026-10",
-      "total": 74
+      "total": 75
     }
   ],
   "days": [
@@ -1899,6 +1899,11 @@
     },
     {
       "date": "2026-10-25",
+      "count": 1,
+      "level": 1
+    },
+    {
+      "date": "2026-10-26",
       "count": 0,
       "level": 0
     }
